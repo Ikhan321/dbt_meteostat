@@ -11,38 +11,55 @@ with flights_daily as (
     from {{ ref('prep_flights') }}
 ),
 
+departures as (
+    select
+        a.faa as airport_code,
+        f.flight_date,
+        f.dest as connection,
+        f.cancelled,
+        f.diverted,
+        f.tail_number,
+        f.airline
+    from {{ ref('prep_airports') }} a
+    join flights_daily f
+        on f.origin = a.faa
+),
+
+arrivals as (
+    select
+        a.faa as airport_code,
+        f.flight_date,
+        f.origin as connection,
+        f.cancelled,
+        f.diverted,
+        f.tail_number,
+        f.airline
+    from {{ ref('prep_airports') }} a
+    join flights_daily f
+        on f.dest = a.faa
+),
+
+combined as (
+    select * from departures
+    union all
+    select * from arrivals
+),
+
 airport_daily_stats as (
     select
-        fd.flight_date as reading_date,
-        a.faa as airport_code,
-        a.name as airport_name,
-        a.city,
-        a.country,
+        airport_code,
+        flight_date as reading_date,
 
-        count(distinct case when fd.origin = a.faa then fd.dest end) as unique_departure_connections,
-        count(distinct case when fd.dest = a.faa then fd.origin end) as unique_arrival_connections,
+        count(distinct connection) as unique_connections,
+        count(*) as total_planned_flights,
+        sum(coalesce(cancelled,0)) as total_cancelled,
+        sum(coalesce(diverted,0)) as total_diverted,
+        sum(case when coalesce(cancelled,0)=0 and coalesce(diverted,0)=0 then 1 end) as total_actual_flights,
 
-        count(case when fd.origin = a.faa or fd.dest = a.faa then 1 end) as total_planned_flights,
-
-        sum(case when fd.origin = a.faa or fd.dest = a.faa then coalesce(fd.cancelled,0) end) as total_cancelled,
-        sum(case when fd.origin = a.faa or fd.dest = a.faa then coalesce(fd.diverted,0) end) as total_diverted,
-
-        sum(
-            case
-                when (fd.origin = a.faa or fd.dest = a.faa)
-                     and coalesce(fd.cancelled,0)=0
-                     and coalesce(fd.diverted,0)=0
-                then 1
-            end
-        ) as total_actual_flights,
-
-        count(distinct case when fd.origin = a.faa or fd.dest = a.faa then fd.tail_number end) as unique_airplanes,
-        count(distinct case when fd.origin = a.faa or fd.dest = a.faa then fd.airline end) as unique_airlines
-
-    from {{ ref('prep_airports') }} a
-    left join flights_daily fd
-        on fd.origin = a.faa or fd.dest = a.faa
-    group by fd.flight_date, a.faa, a.name, a.city, a.country
+        count(distinct tail_number) as unique_airplanes,
+        count(distinct airline) as unique_airlines
+    from combined
+    group by airport_code, flight_date
 ),
 
 weather_daily as (
@@ -57,38 +74,28 @@ weather_daily as (
         avg_wind_speed_kmh,
         wind_peakgust_kmh
     from {{ ref('prep_weather_daily') }}
-),
-
-mart as (
-    select
-        w.airport_code,
-        w.reading_date,
-
-        ads.unique_departure_connections,
-        ads.unique_arrival_connections,
-        ads.total_planned_flights,
-        ads.total_cancelled,
-        ads.total_diverted,
-        ads.total_actual_flights,
-        ads.unique_airplanes,
-        ads.unique_airlines,
-        ads.airport_name,
-        ads.city,
-        ads.country,
-
-        w.min_temp_c,
-        w.max_temp_c,
-        w.precipitation_mm,
-        w.max_snow_mm,
-        w.avg_wind_direction,
-        w.avg_wind_speed_kmh,
-        w.wind_peakgust_kmh
-
-    from weather_daily w
-    left join airport_daily_stats ads
-        on w.airport_code = ads.airport_code
-        and w.reading_date = ads.reading_date
 )
 
-select *
-from mart
+select
+    w.airport_code,
+    w.reading_date,
+
+    ads.unique_connections,
+    ads.total_planned_flights,
+    ads.total_cancelled,
+    ads.total_diverted,
+    ads.total_actual_flights,
+    ads.unique_airplanes,
+    ads.unique_airlines,
+
+    w.min_temp_c,
+    w.max_temp_c,
+    w.precipitation_mm,
+    w.max_snow_mm,
+    w.avg_wind_direction,
+    w.avg_wind_speed_kmh,
+    w.wind_peakgust_kmh
+from weather_daily w
+left join airport_daily_stats ads
+    on w.airport_code = ads.airport_code
+    and w.reading_date = ads.reading_date
