@@ -3,6 +3,7 @@ with source_data as (
     from {{ source('northwind_data', 'categories') }}
 )
 select
-    categoryid   as category_id,
-    categoryname as category_name
+    category_id,
+    category_name
 from source_data
+

@@ -24,10 +24,9 @@ joined as (
         od.quantity,
         od.discount,
 
-        -- business logic: revenue
+        -- revenue calculation
         (od.unit_price * od.quantity * (1 - od.discount)) as revenue,
 
-        -- time dimensions
         extract(year from o.order_date) as order_year,
         extract(month from o.order_date) as order_month
 

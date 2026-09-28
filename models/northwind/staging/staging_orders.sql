@@ -3,13 +3,14 @@ with source_data as (
     from {{ source('northwind_data', 'orders') }}
 )
 select
-    orderid        as order_id,
-    customerid     as customer_id,
-    employeeid     as employee_id,
-    orderdate::date       as order_date,
-    requireddate::date    as required_date,
-    shippeddate::date     as shipped_date,
-    shipvia        as ship_via,
-    shipcity       as ship_city,
-    shipcountry    as ship_country
+    order_id,
+    customer_id,
+    employee_id,
+    order_date::date,
+    required_date::date,
+    shipped_date::date,
+    ship_via,
+    ship_city,
+    ship_country
 from source_data
+

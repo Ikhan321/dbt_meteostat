@@ -3,9 +3,10 @@ with source_data as (
     from {{ source('northwind_data', 'order_details') }}
 )
 select
-    orderid      as order_id,
-    productid    as product_id,
-    unitprice::numeric as unit_price,
-    quantity::int      as quantity,
-    discount::numeric  as discount
+    order_id,
+    product_id,
+    unit_price::numeric,
+    quantity::int,
+    discount::numeric
 from source_data
+
